@@ -41,6 +41,10 @@ dependencies:
   sa4_migration_kit: ^1.0.0
   flutter_session_manager: ^1.0.1
   tapped: ^2.0.0
+  flutter_rating_bar: ^4.0.1
+  get_ip_address: ^0.0.5
+  flutter_easyloading: ^3.0.5
+
 
 
   # The following adds the Cupertino Icons font to your application.

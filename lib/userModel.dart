@@ -22,8 +22,8 @@ class appCacheData {
       appCacheData(username: json["username"], cookie: json["cookie"]);
 }
 
-void save() {
-  FileOperations().writeToFile(jsonEncode(appCacheData.value.toJson()));
+Future<void> save() async {
+  await FileOperations().writeToFile(jsonEncode(appCacheData.value.toJson()));
 }
 
 Future<appCacheData> load() async {

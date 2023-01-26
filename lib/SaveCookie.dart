@@ -13,11 +13,10 @@ class FileOperations {
 
   Future<File> get _localFile async {
     final path = await _localPath;
-    if(!(await File('$path/userData.json').exists()))
-    {
-      await  File('$path/userData.json').create();
+    if (!(await File('$path/userData.json').exists())) {
+      await File('$path/userData.json').create();
       await writeToFile(jsonEncode(appCacheData.value));
-      }
+    }
     return File('$path/userData.json');
   }
 
@@ -26,15 +25,21 @@ class FileOperations {
     return file.writeAsString(statics.toString());
   }
 
-  Future<Map<String,dynamic>> readFromFile() async {
+  Future<Map<String, dynamic>> readFromFile() async {
     final file = await _localFile;
     final contents = await file.readAsString();
     var mapObject = jsonDecode(contents);
     return mapObject;
   }
 
-/*void deleteFromFile() async {
+  Future<void> deleteFile() async {
     final file = await _localFile;
-    final contents = file.writeAsStringSync('');
-  }*/
+    try {
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      // Error in getting access to the file.
+    }
+  }
 }

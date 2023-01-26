@@ -1,17 +1,21 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:ekitap/ApiClient.dart';
 import 'package:ekitap/FadeAnimation.dart';
+import 'package:ekitap/SaveCookie.dart';
 import 'package:ekitap/bookModel.dart';
 import 'package:ekitap/login.dart';
 import 'package:ekitap/pdfViewer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'dart:io' as io;
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:ekitap/userModel.dart';
 
 void main() async {
+  configLoading();
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   appCacheData.value = await load();
@@ -32,6 +36,9 @@ void main() async {
 
 bool isOkey = false;
 bool isEditingMode = false;
+num? rating = null;
+int ID = 0;
+Timer? _timer;
 
 class BookList extends StatefulWidget {
   const BookList({Key? key}) : super(key: key);
@@ -43,6 +50,7 @@ class BookList extends StatefulWidget {
 class _BookListState extends State<BookList> {
   @override
   void initState() {
+    setState(() {});
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
     super.initState();
   }
@@ -57,7 +65,7 @@ class _BookListState extends State<BookList> {
         } else {
           retWidget = Padding(
             padding: const EdgeInsets.only(top: 16),
-            child: Text('Result: ${snapshot.data}'),
+            child: Text(""),
           );
         }
         return retWidget;
@@ -65,8 +73,8 @@ class _BookListState extends State<BookList> {
     );
   }
 
-  Widget bookItem(
-      image, rate, raterCount, pdfStatus, bookName, pdfPath, currentPage,
+  Widget bookItem(image, rate, raterCount, pdfStatus, bookName, pdfPath,
+      currentPage, bookNumber,
       {isLeft}) {
     return Builder(builder: (context) {
       return Padding(
@@ -76,19 +84,33 @@ class _BookListState extends State<BookList> {
           child: Builder(builder: (context) {
             return GestureDetector(
               onTap: () async {
+                print("kitap");
+                _timer?.cancel();
+                await EasyLoading.show(
+                  status: 'Yükleniyor...',
+                  maskType: EasyLoadingMaskType.black,
+                );
                 if (pdfPath.isNotEmpty) {
                   if (!(await io.File(pdfPath).exists())) {
                     await createFileOfPdfUrl(pdfPath);
                   }
                   var dir = await getApplicationDocumentsDirectory();
                   setState(() {});
+                  rating = rate;
+                  ID = bookNumber;
+                  InitialRating=rate??0;
+                  var a=await  ApiClient.post(
+                      "/api/kitaplar/KitapGetir?Id=" + ID.toString(), null);
+                  var retData=jsonDecode(a.body.toString());
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) =>
-                            PDFScreen(path: "${dir.path}/$pdfPath")),
+                        builder: (context) => PDFScreen(
+                              path: "${dir.path}/$pdfPath",CurrentPage: (retData["currentPage"]??1)-1
+                            )),
                   );
-                  setState(() async {});
+                  EasyLoading.dismiss();
+                  setState(() {});
                 }
               },
               child: Container(
@@ -122,7 +144,7 @@ class _BookListState extends State<BookList> {
                             Row(
                               children: [
                                 Text(
-                                  rate != "null" ? rate.toString() : "",
+                                  rate != null ? rate.toString() : "-",
                                   style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -194,13 +216,15 @@ class _BookListState extends State<BookList> {
     for (int i = 0; i < Book.bookList.length; i++) {
       Widget widget = FadeAnimation(
         bookItem(
-            'assets/images/kitap_resim.png',
-            Book.bookList[i].rate,
-            Book.bookList[i].raterCount,
-            await isBookinCache("${dir.path}/${Book.bookList[i].pdfName}"),
-            Book.bookList[i].name,
-            Book.bookList[i].pdfName,
-            Book.bookList[i].currentPage),
+          'assets/images/kitap_resim.png',
+          Book.bookList[i].rate,
+          Book.bookList[i].raterCount,
+          await isBookinCache("${dir.path}/${Book.bookList[i].pdfName}"),
+          Book.bookList[i].name,
+          Book.bookList[i].pdfName,
+          Book.bookList[i].currentPage,
+          Book.bookList[i].ID,
+        ),
       );
       widgetList.add(widget);
     }
@@ -244,6 +268,7 @@ class _BookListState extends State<BookList> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      builder: EasyLoading.init(),
       home: Scaffold(
         backgroundColor: Colors.grey[200],
         body: Padding(
@@ -301,15 +326,38 @@ class _BookListState extends State<BookList> {
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 18),
                               ),
-                              GestureDetector(
-                                onTap: () {
-                                  isEditingMode = !isEditingMode;
-                                  setState(() {});
-                                },
-                                child: Icon(
-                                  isEditingMode ? Icons.cancel : Icons.edit,
-                                  color: Colors.white,
-                                ),
+                              Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      isEditingMode = !isEditingMode;
+                                      setState(() {});
+                                    },
+                                    child: Icon(
+                                      isEditingMode ? Icons.cancel : Icons.edit,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 15,
+                                  ),
+                                  Builder(builder: (context) {
+                                    return GestureDetector(
+                                      onTap: () {
+                                        FileOperations().deleteFile();
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                              builder: (context) => Login()),
+                                        );
+                                      },
+                                      child: Icon(
+                                        Icons.logout_outlined,
+                                        color: Colors.white,
+                                      ),
+                                    );
+                                  }),
+                                ],
                               ),
                             ],
                           ),
@@ -336,7 +384,7 @@ class _BookListState extends State<BookList> {
     );
   }
 
-  Future<void> _showMyDialog(filename,BuildContext c) async {
+  Future<void> _showMyDialog(filename, BuildContext c) async {
     return showDialog<void>(
       context: c,
       barrierDismissible: false, // user must tap button!
@@ -377,19 +425,17 @@ class _BookListState extends State<BookList> {
   Widget bookStatusIcon(bool pdfStatus, String filename) {
     if (isEditingMode) {
       if (pdfStatus)
-        return Builder(
-          builder: (context) {
-            return GestureDetector(
-              onTap: () async {
-                await _showMyDialog(filename,context);
-              },
-              child: Icon(
-                Icons.delete,
-                color: Colors.red,
-              ),
-            );
-          }
-        );
+        return Builder(builder: (context) {
+          return GestureDetector(
+            onTap: () async {
+              await _showMyDialog(filename, context);
+            },
+            child: Icon(
+              Icons.delete,
+              color: Colors.red,
+            ),
+          );
+        });
       return Icon(Icons.cloud_download_rounded,
           color: Colors.white.withOpacity(.1));
     }
